@@ -5,10 +5,14 @@ tweets were then processed and stored in a graph database using Neo4J.
 
 ## Visualizations
 
-### Hashtags
+### Hashtags and Tweets
 
-![Hashtag Graph](./visualizations/hashtags.png)
+![Hashtag Graph](./visualizations/tweets_and_hashtags.png)
 
 ### Tweets with #COVID19
 
 ![COVID19 Tweets](./visualizations/covid_tweets.png)
+
+### Tweets with #Trump
+
+![Trump Tweets](./visualizations/trump_tweets.png)

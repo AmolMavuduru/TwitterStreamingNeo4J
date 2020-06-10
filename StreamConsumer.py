@@ -1,7 +1,8 @@
 from kafka import KafkaConsumer
 import json
 from py2neo import Graph, Node, Relationship, Database
-from textblob import TextBlob
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from googletrans import Translator
 import re
 import string
 
@@ -15,11 +16,17 @@ def get_hashtag_list(tweet_dict):
     return [hash['text'] for hash in tweet_dict['entities']['hashtags']]
 
 
-def get_sentiment_data(tweet):
+def get_sentiment_data(tweet, english=True):
 
-    analysis = TextBlob(remove_punct(tweet))
+    sentiment_analyzer = SentimentIntensityAnalyzer()
+    translator = Translator()
 
-    polarity = analysis.sentiment.polarity
+    if not english:
+        tweet = translator.translate(tweet).text
+
+    analysis = sentiment_analyzer.polarity_scores(remove_punct(tweet))
+
+    polarity = analysis['compound']
 
 
     if polarity > 0:
@@ -54,9 +61,11 @@ def main():
     for msg in consumer:
 
         dict_data = json.loads(msg.value.decode('utf-8'))
-        text = TextBlob(dict_data["text"])
         tweet_text = dict_data["text"]
-        sentiment_data = get_sentiment_data(dict_data["text"])
+        try:
+            sentiment_data = get_sentiment_data(dict_data["text"], english=False)
+        except:
+            sentiment_data = get_sentiment_data(dict_data["text"], english=True)
         tweet_id = dict_data["id_str"]
         location = dict_data["user"]["location"]
         screen_name = dict_data["user"]["screen_name"]
@@ -66,31 +75,31 @@ def main():
         print("id: ", tweet_id)
         print("screen name: ", screen_name)
         print("location: ", location)
+        print("sentiment: ", sentiment_data['sentiment'])
         print("text: ", tweet_text)
-        print("Hashtags: ", hashtags)
+        #print("Hashtags: ", hashtags)
         # add text and sentiment info to neo4j
 
         tx = g.begin()
-        tweet_node = Node("Tweet", id=tweet_id,
-            screen_name=screen_name, 
-            location=location, 
-            text=tweet_text)
-        tx.create(tweet_node)
+        tweet_node = Node("Tweet", id = tweet_id,
+            screen_name = screen_name, 
+            location = location, 
+            text = tweet_text,
+            sentiment = sentiment_data['sentiment'],
+            polarity = sentiment_data['polarity'])
+        tx.merge(tweet_node, "Tweet", "id")
 
         print(dict(tweet_node))
 
         for hashtag in hashtags:
 
             hashtag_node = Node("Hashtag", name=hashtag)
-            #INCLUDES = Relationship.type("INCLUDES")
-            print(dict(hashtag_node))
+            #print(dict(hashtag_node))
+            tx.merge(hashtag_node, "Hashtag", "name")
             tweet_hashtag_rel = Relationship(tweet_node, "INCLUDES", hashtag_node)
-            tx.create(tweet_hashtag_rel)
-            #g.merge(INCLUDES(tweet_node, hashtag_node), "Tweet", "id")
+            tx.merge(tweet_hashtag_rel, "Hashtag", "name")
 
         tx.commit()
-
-
         
         print('\n')
 
