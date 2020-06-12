@@ -87,9 +87,13 @@ def main():
             text = tweet_text,
             sentiment = sentiment_data['sentiment'],
             polarity = sentiment_data['polarity'])
-        tx.merge(tweet_node, "Tweet", "id")
 
-        print(dict(tweet_node))
+        try:
+            tx.merge(tweet_node, "Tweet", "id")
+        except:
+            continue
+
+        #print(dict(tweet_node))
 
         for hashtag in hashtags:
 

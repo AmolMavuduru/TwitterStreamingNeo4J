@@ -33,7 +33,7 @@ class KafkaPushListener(StreamListener):
         # Producer produces data for consumer
         # Data comes from Twitter
         self.producer.send("twitter", data.encode('utf-8'))
-        print(data)
+        #print(data)
         return True
 
     def on_error(self, status):
@@ -42,7 +42,8 @@ class KafkaPushListener(StreamListener):
 
 def stream_tweets(hashtag_list):
     twitter_stream = Stream(auth, KafkaPushListener())
-    twitter_stream.filter(track=hashtag_list)
+    if hashtag_list is not None:
+        twitter_stream.filter(track=hashtag_list)
 
 hashtags = ["#coronavirus", "#trump", "#georgefloyd"]
-stream_tweets(hashtags)
+stream_tweets(hashtag_list=hashtags)
