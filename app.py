@@ -12,55 +12,17 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly
 import plotly.graph_objs as go
+import plotly.express as px
 from py2neo import Graph, Node, Relationship, Database
 from dash.dependencies import Input, Output
 
-KAFKA_DIR = "~/Downloads/kafka_2.12-2.5.0"
+#KAFKA_DIR = "~/Downloads/kafka_2.12-2.5.0"
 
-global child_processes
-global status_dict
-
-child_processes = defaultdict()
-status_dict = defaultdict()
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
-"""
-def kill_subprocesses():
-
-	for key, process in child_processes.items():
-		process.terminate()
-
-
-def wait_subprocesses():
-
-	for key, process in child_processes.items():
-		status_dict[key] = process.wait()
-
-
-atexit.register(kill_subprocesses)
-
-
-def start_zookeeper(kafka_dir):
-
-	pass
-
-
-def start_kafka_server(kafka_dir):
-
-	pass
-
-def start_kafka_producer():
-
-	child_processes['stream_producer'] = subprocess.Popen(["python", "StreamProducer.py"])
-
-
-def start_kafka_consumer():
-
-	child_processes['stream_consumer'] = subprocess.Popen(["python", "StreamConsumer.py"])
-"""
 
 class Neo4JDataExtractor(object):
 
@@ -85,8 +47,8 @@ class Neo4JDataExtractor(object):
 
 	def get_top5_tweets_df(self):
 
-		self.tweets = self.graph.run("MATCH (t: Tweet) RETURN t.screen_name AS user, t.sentiment AS sentiment, t.text AS text LIMIT 5").to_data_frame()
-		return self.tweets
+		self.get_tweets_df()
+		return self.tweets.tail(5)
 
 data_extractor = Neo4JDataExtractor("neo4j", "abc123")
 
@@ -109,19 +71,37 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
         'color': colors['text']
     }),
 
+    html.Br(),
+
+   	html.H4(children='Most Recent Tweets',
+        style={
+            'textAlign': 'center',
+            'color': colors['text']
+    }),
+
     dash_table.DataTable(
     	id='live-tweet-table',
     	columns=([{'id': 'user', 'name': 'user'},
     			  {'id': 'text', 'name': 'text'},
-    			  {'id': 'sentiment', 'name': 'sentiment'}]),
+    			  {'id': 'sentiment', 'name': 'sentiment'},
+    			  {'id': 'polarity', 'name': 'polarity'}]),
     	),
 
     dcc.Graph(id='live-hashtag-graph'),
+
+    dcc.Graph(id='live-sentiment-pie'),
+
+
     dcc.Interval(
             id='interval-component',
-            interval=1*1000, # in milliseconds
+            interval=3*1000, # in milliseconds
             n_intervals=0
-        )
+        ),
+
+    dcc.Interval(
+    		id='pie-chart-interval',
+    		interval=3*1000,
+    		n_intervals=0)
 ])
 
 @app.callback(Output('live-hashtag-graph', 'figure'),
@@ -148,6 +128,31 @@ def update_graph_live(n):
 		yaxis_title="Number of Tweets")
 
 	return fig
+
+
+
+@app.callback(Output('live-sentiment-pie', 'figure'),
+			  [Input('pie-chart-interval', 'n_intervals')])
+def update_sentiment_pie(n):
+
+	tweets = data_extractor.get_tweets_df()
+	sentiment_counts = tweets['sentiment'].value_counts()
+	sentiment_counts = pd.DataFrame({'sentiment': list(sentiment_counts.index), 'count': sentiment_counts}).reset_index(drop=True)
+	trace = go.Pie(labels = sentiment_counts['sentiment'], values = sentiment_counts['count'])
+	data = [trace]
+	fig = go.Figure(data = data)
+
+	fig.update_layout(title={
+        'text': "Overall Tweet Sentiment",
+        'y':0.9,
+        'x':0.5,
+        'xanchor': 'center',
+        'yanchor': 'top'
+        })
+
+	return fig
+
+
 
 @app.callback(Output('live-tweet-table', 'data'),
               [Input('interval-component', 'n_intervals')])

@@ -57,7 +57,6 @@ def main():
     db = Database("bolt://localhost:7687", user="neo4j", password="abc123")
     g = Graph("bolt://localhost:7687", user="neo4j", password="abc123")
 
-
     for msg in consumer:
 
         dict_data = json.loads(msg.value.decode('utf-8'))

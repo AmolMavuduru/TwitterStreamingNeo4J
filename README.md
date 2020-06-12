@@ -1,9 +1,15 @@
 # TwitterStreamingNeo4J
 
-In this project, tweets were streamed from Twitter using Kafka and Tweepy. The resulting
-tweets were then processed and stored in a graph database using Neo4J. 
+In this project, tweets were streamed from Twitter using Kafka and Tweepy, and stored in a Neo4J graph database, which 
+was used for live analytics in a dash application. 
 
-## Visualizations
+## Dash App
+
+![Tweet Stream](./visualizations/tweets_and_bar.png)
+
+![Graphs](./visualizations/bar_and_pie.png)
+
+## Neo4J Visualizations
 
 ### Hashtags and Tweets
 
