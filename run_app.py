@@ -1,10 +1,11 @@
 import os
 import subprocess
 import sys
+import time
 import atexit
 from collections import defaultdict
 
-KAFKA_DIR = "~/Downloads/kafka_2.12-2.5.0"
+KAFKA_DIR = "/Users/amol/Downloads/kafka_2.12-2.5.0"
 
 global child_processes
 global status_dict
@@ -28,18 +29,15 @@ def wait_subprocesses():
 atexit.register(kill_subprocesses)
 
 
-def start_zookeeper(kafka_dir):
+def start_zookeeper_kafka(kafka_dir=KAFKA_DIR):
 
-	pass
+	child_processes['kafka_servers'] = subprocess.Popen(["./start_zookeeper_kafka.sh"])
 
-
-def start_kafka_server(kafka_dir):
-
-	pass
 
 def start_kafka_producer():
 
 	child_processes['stream_producer'] = subprocess.Popen(["python", "StreamProducer.py"])
+	print('Running Kafka')
 
 
 def start_kafka_consumer():
@@ -51,7 +49,8 @@ def start_app():
 
 	child_processes['dash_app'] = subprocess.Popen(["python", "app.py"])
 
-
+start_zookeeper_kafka()
+time.sleep(5)
 start_kafka_producer()
 start_kafka_consumer()
 start_app()
