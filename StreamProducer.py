@@ -45,5 +45,5 @@ def stream_tweets(hashtag_list):
     if hashtag_list is not None:
         twitter_stream.filter(track=hashtag_list)
 
-hashtags = ["#coronavirus", "#trump", "#georgefloyd", '#biden']
-stream_tweets(hashtag_list=hashtags)
+topics = ["coronavirus", "trump", "george floyd", 'biden', "blacklivesmatter"]
+stream_tweets(hashtag_list=topics)

@@ -3,6 +3,8 @@ import subprocess
 import sys
 import numpy as np
 import pandas as pd
+import base64
+from io import BytesIO
 from time import sleep
 import atexit
 from collections import defaultdict
@@ -13,11 +15,11 @@ import dash_html_components as html
 import plotly
 import plotly.graph_objs as go
 import plotly.express as px
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 from py2neo import Graph, Node, Relationship, Database
 from dash.dependencies import Input, Output
 
 #KAFKA_DIR = "~/Downloads/kafka_2.12-2.5.0"
-
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -26,29 +28,39 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 class Neo4JDataExtractor(object):
 
-	def __init__(self, user, password):
+    def __init__(self, user, password):
 
-		self.database = Database("bolt://localhost:7687", user="neo4j", password="abc123")
-		self.graph = Graph("bolt://localhost:7687", user="neo4j", password="abc123")
+        self.database = Database("bolt://localhost:7687", user="neo4j", password="abc123")
+        self.graph = Graph("bolt://localhost:7687", user="neo4j", password="abc123")
 
 
-	def get_tweets_df(self):
+    def get_tweets_df(self):
 
-		self.tweets = self.graph.run("MATCH (t: Tweet) RETURN t.screen_name AS user, t.sentiment AS sentiment, t.polarity AS polarity, t.text AS text").to_data_frame()
-		return self.tweets
+        self.tweets = self.graph.run("MATCH (t: Tweet) RETURN t.screen_name AS user, t.sentiment AS sentiment, t.polarity AS polarity, t.text AS text").to_data_frame()
+        return self.tweets
 
-	def get_hashtags_df(self):
+    def get_hashtags_df(self):
 
-		hashtags = self.graph.run("MATCH (t: Tweet) --> (h: Hashtag) RETURN h.name AS hashtag").to_data_frame()
-		counts = hashtags['hashtag'].value_counts()
-		hashtag_counts_df = pd.DataFrame({'hashtag': list(counts.index), 'count': counts}).reset_index(drop=True)
-		self.hashtag_counts_df = hashtag_counts_df.sort_values(by=['count'], ascending=False)
-		return self.hashtag_counts_df
+        hashtags = self.graph.run("MATCH (t: Tweet) --> (h: Hashtag) RETURN h.name AS hashtag").to_data_frame()
+        counts = hashtags['hashtag'].value_counts()
+        hashtag_counts_df = pd.DataFrame({'hashtag': list(counts.index), 'count': counts}).reset_index(drop=True)
+        self.hashtag_counts_df = hashtag_counts_df.sort_values(by=['count'], ascending=False)
+        return self.hashtag_counts_df
 
-	def get_top5_tweets_df(self):
+    def get_top5_tweets_df(self):
 
-		self.get_tweets_df()
-		return self.tweets.tail(5)
+        self.get_tweets_df()
+        return self.tweets.tail(5)
+
+    def plot_wordcloud(self):
+
+        self.get_hashtags_df()
+        self.hashtag_counts_dict = dict(zip(self.hashtag_counts_df['hashtag'], self.hashtag_counts_df['count']))
+        wc = WordCloud(background_color='white', width=720, height=480)
+        wc.fit_words(self.hashtag_counts_dict)
+        return wc.to_image()
+
+
 
 data_extractor = Neo4JDataExtractor("neo4j", "abc123")
 
@@ -57,7 +69,7 @@ colors = {
     'text': 'black'
 }
 
-app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
+app.layout = html.Div(style={'backgroundColor': colors['background'], 'textAlign': 'center'}, children=[
     html.H1(
         children='Twitter Live Streaming',
         style={
@@ -66,7 +78,7 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
         }
     ),
 
-    html.Div(children='Built with Kafka, Tweepy, Neo4J, and Dask', style={
+    html.Div(children='Built with Kafka, Tweepy, Neo4J, and Dash', style={
         'textAlign': 'center',
         'color': colors['text']
     }),
@@ -91,6 +103,13 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
 
     dcc.Graph(id='live-sentiment-pie'),
 
+    html.H4(children='Hashtag Word Cloud',
+        style={
+            'textAlign': 'center',
+            'color': colors['text']
+    }),
+
+    html.Img(id='word-cloud'),
 
     dcc.Interval(
             id='interval-component',
@@ -101,7 +120,12 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
     dcc.Interval(
     		id='pie-chart-interval',
     		interval=3*1000,
-    		n_intervals=0)
+    		n_intervals=0),
+
+    dcc.Interval(
+            id='word-cloud-interval',
+            interval=4*1000,
+            n_intervals=0)
 ])
 
 @app.callback(Output('live-hashtag-graph', 'figure'),
@@ -151,6 +175,14 @@ def update_sentiment_pie(n):
         })
 
 	return fig
+
+
+@app.callback(Output('word-cloud', 'src'), 
+              [Input('word-cloud-interval', 'n_intervals')])
+def make_image(n):
+    img = BytesIO()
+    data_extractor.plot_wordcloud().save(img, format='PNG')
+    return 'data:image/png;base64,{}'.format(base64.b64encode(img.getvalue()).decode())
 
 
 

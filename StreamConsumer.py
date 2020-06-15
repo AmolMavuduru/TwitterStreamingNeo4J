@@ -6,6 +6,7 @@ from googletrans import Translator
 import re
 import string
 
+
 def remove_punct(text):
     text  = "".join([char for char in text if char not in string.punctuation])
     text = re.sub('[0-9]+', '', text)
@@ -60,11 +61,15 @@ def main():
     for msg in consumer:
 
         dict_data = json.loads(msg.value.decode('utf-8'))
-        tweet_text = dict_data["text"]
         try:
-            sentiment_data = get_sentiment_data(dict_data["text"], english=False)
+            tweet_text = dict_data["text"]
         except:
-            sentiment_data = get_sentiment_data(dict_data["text"], english=True)
+            tweet_text = ""
+
+        try:
+            sentiment_data = get_sentiment_data(tweet_text, english=False)
+        except:
+            sentiment_data = get_sentiment_data(tweet_text, english=True)
         tweet_id = dict_data["id_str"]
         location = dict_data["user"]["location"]
         screen_name = dict_data["user"]["screen_name"]
