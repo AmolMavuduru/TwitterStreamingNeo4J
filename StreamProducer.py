@@ -42,8 +42,7 @@ class KafkaPushListener(StreamListener):
 
 def stream_tweets(hashtag_list):
     twitter_stream = Stream(auth, KafkaPushListener())
-    if hashtag_list is not None:
-        twitter_stream.filter(track=hashtag_list)
+    twitter_stream.filter(track=hashtag_list)
 
-topics = ["coronavirus", "trump", "george floyd", 'biden', "blacklivesmatter"]
+topics = ["coronavirus", "trump", 'biden', "blacklivesmatter"]
 stream_tweets(hashtag_list=topics)

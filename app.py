@@ -15,6 +15,7 @@ import dash_html_components as html
 import plotly
 import plotly.graph_objs as go
 import plotly.express as px
+from collections import defaultdict
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 from py2neo import Graph, Node, Relationship, Database
 from dash.dependencies import Input, Output
@@ -32,6 +33,8 @@ class Neo4JDataExtractor(object):
 
         self.database = Database("bolt://localhost:7687", user="neo4j", password="abc123")
         self.graph = Graph("bolt://localhost:7687", user="neo4j", password="abc123")
+        self.hashtag_counts_df = None
+        self.tweets = None
 
 
     def get_tweets_df(self):
@@ -59,6 +62,28 @@ class Neo4JDataExtractor(object):
         wc = WordCloud(background_color='white', width=720, height=480)
         wc.fit_words(self.hashtag_counts_dict)
         return wc.to_image()
+
+    def get_sentiment_counts(self, hashtag):
+
+        pos_query = "MATCH (h:Hashtag {name: '" + hashtag + "'}) <-- (t:Tweet) WHERE t.sentiment = 'positive' RETURN count(t) AS count"
+        neut_query = "MATCH (h:Hashtag {name: '" + hashtag + "'}) <-- (t:Tweet) WHERE t.sentiment = 'neutral' RETURN count(t) AS count"
+        neg_query = "MATCH (h:Hashtag {name: '" + hashtag + "'}) <-- (t:Tweet) WHERE t.sentiment = 'negative' RETURN count(t) AS count"
+        
+        positive_count = self.graph.run(pos_query).to_data_frame()['count'][0]
+        neutral_count = self.graph.run(neut_query).to_data_frame()['count'][0]
+        negative_count = self.graph.run(neg_query).to_data_frame()['count'][0]
+        
+        return {'positive': positive_count, 'neutral': neutral_count, 'negative': negative_count}
+
+    def get_sentiment_counts_dict(self, hashtags: list):
+
+        hashtag_sentiment_dict = {'positive': defaultdict(), 'neutral': defaultdict(), 'negative': defaultdict()}
+        for hashtag in hashtags:
+            sentiment_counts = self.get_sentiment_counts(hashtag)
+            for sentiment, count in sentiment_counts.items():
+                hashtag_sentiment_dict[sentiment][hashtag] = count
+        
+        return hashtag_sentiment_dict
 
 
 
@@ -132,26 +157,37 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'textAlign
               [Input('interval-component', 'n_intervals')])
 def update_graph_live(n):
 
-	hashtag_counts_df = data_extractor.get_hashtags_df()
-	hashtags = list(hashtag_counts_df['hashtag'][:10])
-	counts = list(hashtag_counts_df['count'][:10])
-	fig = go.Figure(
-		data=[go.Bar(
-	        x=hashtags, y=counts,
-	        text=counts,
-	        textposition='auto',
-	    )])
+    hashtag_counts_df = data_extractor.get_hashtags_df()
+    hashtags = list(hashtag_counts_df['hashtag'][:10])
+    """
+    counts = list(hashtag_counts_df['count'][:10])
+    fig = go.Figure(
+    	data=[go.Bar(
+            x=hashtags, y=counts,
+            text=counts,
+            textposition='auto',
+        )])
+    """
 
-	fig.update_layout(title={
+    sentiment_counts = data_extractor.get_sentiment_counts_dict(hashtags)
+    fig = go.Figure(data=[
+    go.Bar(name='positive', x=hashtags, y=list(sentiment_counts['positive'].values()), marker_color='green'),
+    go.Bar(name='neutral', x=hashtags, y=list(sentiment_counts['neutral'].values()), marker_color='blue'),
+    go.Bar(name='negative', x=hashtags, y=list(sentiment_counts['negative'].values()), marker_color='red')
+    ])
+
+
+    fig.update_layout(title={
         'text': "Top 10 Hashtags",
         'y':0.9,
         'x':0.5,
         'xanchor': 'center',
         'yanchor': 'top'},
-		xaxis_title="Hashtag",
-		yaxis_title="Number of Tweets")
+    	xaxis_title="Hashtag",
+    	yaxis_title="Number of Tweets",
+        barmode='stack')
 
-	return fig
+    return fig
 
 
 

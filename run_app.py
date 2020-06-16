@@ -6,6 +6,7 @@ import atexit
 from collections import defaultdict
 
 KAFKA_DIR = "/Users/amol/Downloads/kafka_2.12-2.5.0"
+START_KAFKA_AUTO = True
 
 global child_processes
 global status_dict
@@ -49,8 +50,10 @@ def start_app():
 
 	child_processes['dash_app'] = subprocess.Popen(["python", "app.py"])
 
-start_zookeeper_kafka()
-time.sleep(5)
+if START_KAFKA_AUTO:
+	start_zookeeper_kafka()
+	time.sleep(5)
+
 start_kafka_producer()
 start_kafka_consumer()
 start_app()
